@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Funcionário 24h
 
-## Getting Started
+> Sua empresa nunca trabalha sozinha.
 
-First, run the development server:
+Plataforma SaaS multi-tenant de funcionários digitais com IA que atendem pelo WhatsApp em modelo de **autonomia assistida**: ações sensíveis só acontecem depois de aprovação humana.
+
+Arquitetura, riscos e plano completo: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md).
+
+## Status
+
+| Fase | Situação |
+|---|---|
+| 1. Fundação, auth, banco, organizações | ✅ Pronta — schema completo, RLS, 8 migrations, 41 testes SQL |
+| 2. Dashboard, navegação, identidade visual | ✅ Pronta — dados reais via `org_dashboard_stats` |
+| 3. Funcionários | ✅ Pronta — CRUD, modelos, instruções versionadas, permissões por ferramenta, desempenho |
+| Base de conhecimento | ✅ Pronta (texto). Upload de arquivos: pendente (Supabase Storage) |
+| 4. Núcleo de IA | ⏳ Próxima — tabelas, catálogo de ferramentas e fila já existem |
+| 5. WhatsApp Cloud API | ⏳ Pendente — schema de integração, segredos e deduplicação prontos |
+| 6–9 | ⏳ Pendente — aprovações, CRM e admin já têm regras e RPCs no banco, testadas |
+
+Ainda **não** foi testado contra um projeto Supabase real (o banco foi validado em Postgres 16 local com um stub do schema `auth`).
+
+## Rodando localmente
 
 ```bash
+cp .env.example .env.local     # preencha as chaves do Supabase
+npm install --legacy-peer-deps
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Aplicar o banco em um projeto Supabase:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+supabase link --project-ref SEU_REF
+supabase db push               # aplica supabase/migrations/*
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+No painel do Supabase → Authentication → URL Configuration, adicione `https://SEU_DOMINIO/auth/callback` às Redirect URLs.
 
-## Learn More
+Para tornar alguém administrador da plataforma:
 
-To learn more about Next.js, take a look at the following resources:
+```sql
+insert into public.platform_admins (user_id) values ('<uuid do usuário>');
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Testes
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm test            # unitários (vitest)
+npm run test:db     # migrations + RLS em Postgres local (requer psql/postgres)
+npm run typecheck
+```
 
-## Deploy on Vercel
+## Princípios de segurança
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Toda tabela de negócio tem `organization_id` e RLS. Acesso decidido por funções `security definer` no schema `private`.
+- Segredos de integração, fila de jobs e eventos de webhook não têm nenhuma policy: só o servidor (`service_role`) acessa.
+- Aprovações só mudam pela RPC `decide_approval`; tarefas que exigem aprovação são bloqueadas por constraint + trigger.
+- "Venda ganha" exige usuário humano autenticado e evidência (a IA não pode confirmar venda).
+- O admin da plataforma usa apenas funções agregadas (`admin_*`) e não tem policy de leitura sobre conversas, mensagens, contatos ou base de conhecimento.
+- Alterações em funcionários, instruções e base são auditadas por trigger, independentemente da interface.
