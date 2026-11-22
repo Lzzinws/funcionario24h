@@ -59,12 +59,13 @@ export class MercadoPagoClient {
   }
 
   createPreapproval(input: {
-    reason: string; externalReference: string; payerEmail: string; amountBrl: number; backUrl: string; idempotencyKey: string;
+    reason: string; externalReference: string; payerEmail?: string; amountBrl: number; backUrl: string; idempotencyKey: string;
   }) {
+    // payer_email é opcional: sem ele, o comprador se identifica no próprio checkout do Mercado Pago.
     return this.request<Preapproval>("POST", "/preapproval", {
       reason: input.reason,
       external_reference: input.externalReference,
-      payer_email: input.payerEmail,
+      ...(input.payerEmail ? { payer_email: input.payerEmail } : {}),
       auto_recurring: { frequency: 1, frequency_type: "months", transaction_amount: input.amountBrl, currency_id: "BRL" },
       back_url: input.backUrl,
       status: "pending",

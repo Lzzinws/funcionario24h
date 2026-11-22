@@ -33,7 +33,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
   if (checkout) await syncCheckout(checkout); // retorno do Mercado Pago: confirma o estado na hora
 
   const ctx = await requireOrg();
-  const { supabase, org, role, subscription: sub, plan: currentPlan, userEmail } = ctx;
+  const { supabase, org, role, subscription: sub, plan: currentPlan } = ctx;
   const cfg = billingConfig();
   const owner = role === "owner";
   const state = effectiveState(sub);
@@ -87,7 +87,7 @@ export default async function BillingPage({ searchParams }: { searchParams: Prom
                   <p className="tabular mt-2 font-display text-2xl font-semibold">{formatBRL(p.price_cents)}<span className="text-sm font-normal text-sage-dark">/mês</span></p>
                   <p className="mt-1 text-[13px] text-sage-dark">Até {p.max_employees} funcionário{p.max_employees > 1 ? "s" : ""} · {p.max_whatsapp_numbers} WhatsApp</p>
                   {owner && !isCurrent ? (
-                    <CheckoutForm planId={p.id} planName={p.name} defaultEmail={userEmail ?? ""} label={label} disabled={!cfg.ready} variant={p.id === "profissional" ? "primary" : "outline"} />
+                    <CheckoutForm planId={p.id} planName={p.name} label={label} disabled={!cfg.ready} variant={p.id === "profissional" ? "primary" : "outline"} />
                   ) : null}
                 </Card>
               );

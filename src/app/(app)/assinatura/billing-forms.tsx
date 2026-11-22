@@ -7,18 +7,14 @@ import { FormMessage } from "@/components/ui/form-message";
 import { SubmitButton } from "@/components/ui/submit-button";
 import { cancelSubscription, startCheckout } from "./actions";
 
-export function CheckoutForm({ planId, planName, defaultEmail, label, disabled, variant }: {
-  planId: string; planName: string; defaultEmail: string; label: string; disabled?: boolean; variant: "primary" | "outline";
+export function CheckoutForm({ planId, planName, label, disabled, variant }: {
+  planId: string; planName: string; label: string; disabled?: boolean; variant: "primary" | "outline";
 }) {
   const [state, action] = useActionState(startCheckout, initialActionState);
-  const fieldId = `payer_email_${planId}`;
   return (
     <form action={action} className="mt-5 grid gap-3">
       <input type="hidden" name="plan_id" value={planId} />
-      <Field label="E-mail do pagador no Mercado Pago" htmlFor={fieldId} error={state.fieldErrors?.payer_email}>
-        <Input id={fieldId} name="payer_email" type="email" defaultValue={defaultEmail} required disabled={disabled}
-          aria-invalid={state.fieldErrors?.payer_email ? true : undefined} />
-      </Field>
+      <p className="text-[13px] text-sage-dark">Você vai entrar com a conta do Mercado Pago que vai pagar na próxima tela.</p>
       <FormMessage state={state} />
       <SubmitButton variant={variant} disabled={disabled} pendingLabel="Abrindo o Mercado Pago…" aria-label={`${label} ${planName}`}>{label}</SubmitButton>
     </form>

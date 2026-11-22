@@ -12,7 +12,6 @@ import type { ActionState } from "@/lib/action-result";
 
 const checkoutSchema = z.object({
   plan_id: z.enum(["starter", "profissional", "business"]),
-  payer_email: z.string().trim().email("Informe o e-mail da conta Mercado Pago que vai pagar"),
 });
 
 async function ownerCtx() {
@@ -32,8 +31,10 @@ export async function startCheckout(_: ActionState, form: FormData): Promise<Act
   if (!cfg.ready) return { ok: false, message: "Pagamentos ainda não configurados no servidor." };
 
   const parsed = checkoutSchema.safeParse(Object.fromEntries(form));
-  if (!parsed.success) return { ok: false, fieldErrors: { payer_email: parsed.error.issues[0].message } };
-  const { plan_id, payer_email } = parsed.data;
+  if (!parsed.success) return { ok: false, message: "Escolha um plano válido." };
+  const { plan_id } = parsed.data;
+  const payer_email = ctx.userEmail;
+  if (!payer_email) return { ok: false, message: "Sua conta não tem e-mail cadastrado." };
 
   const { data: plan } = await ctx.supabase.from("plans").select("id, name, price_cents, is_active").eq("id", plan_id).maybeSingle();
   if (!plan?.is_active) return { ok: false, message: "Plano indisponível." };
@@ -59,7 +60,6 @@ export async function startCheckout(_: ActionState, form: FormData): Promise<Act
     const pre = await mp.createPreapproval({
       reason: `Funcionário 24h — Plano ${plan.name}`,
       externalReference: externalReference(checkout.id),
-      payerEmail: payer_email,
       amountBrl: plan.price_cents / 100,
       backUrl: `${cfg.appUrl}/assinatura?checkout=${checkout.id}`,
       idempotencyKey: checkout.id,
@@ -72,7 +72,7 @@ export async function startCheckout(_: ActionState, form: FormData): Promise<Act
     await db.from("billing_checkouts").update({ status: "failed" }).eq("id", checkout.id);
     console.error("checkout mercadopago:", e instanceof Error ? e.message : e);
     const msg = e instanceof MercadoPagoError && e.status === 400
-      ? "O Mercado Pago recusou os dados. Confira o e-mail do pagador (em modo teste, use o e-mail de um usuário de teste comprador)."
+      ? "O Mercado Pago recusou os dados da contratação. Tente de novo; se persistir, me avise com a mensagem exata."
       : "Não foi possível falar com o Mercado Pago agora. Tente novamente em instantes.";
     return { ok: false, message: msg };
   }
