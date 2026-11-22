@@ -24,9 +24,9 @@ Em produção: app no Vercel (`funcionario24h.vercel.app`) e banco no Supabase (
 ## Núcleo de IA
 
 - `src/lib/ai/orchestrator.ts` — pipeline de 11 etapas (empresa → cliente → funcionário → base → modelo → permissões → aprovação → registro → resposta).
-- Modelo padrão `claude-opus-5-5` com esforço `low` (ajustáveis por `AI_MODEL` e `AI_EFFORT`) e fallback automático no servidor quando o modelo recusa.
+- Modelo padrão `gemini-3.6-flash` (Google Gemini, ajustável por `AI_MODEL`). Se o filtro de segurança bloquear uma resposta, a conversa vai para um atendente humano.
 - Ações sensíveis (agendamento, desconto, acompanhamento) **sempre** viram pedido de aprovação, independentemente da configuração.
-- Variáveis necessárias no servidor: `ANTHROPIC_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
+- Variáveis necessárias no servidor: `GEMINI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY`.
 
 ## Rodando localmente
 

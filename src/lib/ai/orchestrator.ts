@@ -1,11 +1,11 @@
-import Anthropic from "@anthropic-ai/sdk";
-import { AI_CONFIG, estimateCostMicros, totalInputTokens } from "./config";
+import { AI_CONFIG, estimateCostMicros } from "./config";
 import { detectInjection, cleanReply } from "./guardrails";
 import { buildSystemPrompt, buildTurnMessage, INJECTION_NOTICE } from "./prompt";
 import { allowedTools, toApiTools } from "./tool-schemas";
 import { executeTool } from "./executor";
-import type { LlmClient } from "./llm";
+import type { LlmClient, LlmContent } from "./llm";
 import type { AiRepository, ConversationContext } from "./types";
+import type { ToolName } from "@/lib/employees/tools";
 
 export const HANDOFF_MESSAGE =
   "Obrigado pela mensagem! Um atendente da nossa equipe vai continuar o seu atendimento em breve.";
@@ -69,8 +69,8 @@ export async function runEmployeeTurn(input: TurnInput, deps: { repo: AiReposito
   const allowed = allowedTools(employee.tools, employee.permissions);
   const tools = toApiTools(allowed);
   const system = buildSystemPrompt(ctx);
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: buildTurnMessage(turnCtx, inboundText, now) }];
-  if (injection.suspected) messages.push({ role: "system", content: INJECTION_NOTICE });
+  const userText = buildTurnMessage(turnCtx, inboundText, now) + (injection.suspected ? `\n\n${INJECTION_NOTICE}` : "");
+  const contents: LlmContent[] = [{ role: "user", parts: [{ text: userText }] }];
 
   let tokens = 0;
   let costMicros = 0;
@@ -81,60 +81,57 @@ export async function runEmployeeTurn(input: TurnInput, deps: { repo: AiReposito
 
   for (let step = 0; step <= AI_CONFIG.maxToolSteps; step++) {
     const started = Date.now();
-    let response: Anthropic.Beta.BetaMessage;
+    let turn;
     try {
-      response = await llm.createMessage({
-        model: AI_CONFIG.model,
-        max_tokens: AI_CONFIG.maxOutputTokens,
-        output_config: { effort: AI_CONFIG.effort },
-        system,
-        tools: tools.length ? tools : undefined,
-        messages,
-      });
+      turn = await llm.generate({ system, contents, tools, maxOutputTokens: AI_CONFIG.maxOutputTokens });
     } catch (e) {
-      const retryable = e instanceof Anthropic.RateLimitError || e instanceof Anthropic.InternalServerError || e instanceof Anthropic.APIConnectionError;
-      await repo.audit({ orgId: ctx.org.id, employeeId: employee.id, action: "ai.error", entityType: "conversation", entityId: ctx.conversation.id, metadata: { step, retryable, error: e instanceof Error ? e.message.slice(0, 300) : "erro desconhecido" } });
+      const status = (e as { status?: number }).status;
+      const retryable = status === 429 || (typeof status === "number" && status >= 500);
+      await repo.audit({ orgId: ctx.org.id, employeeId: employee.id, action: "ai.error", entityType: "conversation", entityId: ctx.conversation.id, metadata: { step, retryable, status: status ?? null, error: e instanceof Error ? e.message.slice(0, 300) : "erro desconhecido" } });
       return { status: "error", reason: "Falha ao consultar o modelo de IA.", retryable };
     }
 
     // 10. Consumo e custo de cada chamada.
-    const callCost = estimateCostMicros(response.model ?? AI_CONFIG.model, response.usage);
-    tokens += totalInputTokens(response.usage) + response.usage.output_tokens;
+    const callCost = estimateCostMicros(turn.usage);
+    tokens += turn.usage.input + turn.usage.output;
     costMicros += callCost;
-    await repo.recordUsage({ orgId: ctx.org.id, employeeId: employee.id, conversationId: ctx.conversation.id, model: response.model ?? AI_CONFIG.model,
-      inputTokens: totalInputTokens(response.usage), outputTokens: response.usage.output_tokens, costMicros: callCost, latencyMs: Date.now() - started });
+    await repo.recordUsage({ orgId: ctx.org.id, employeeId: employee.id, conversationId: ctx.conversation.id, model: AI_CONFIG.model,
+      inputTokens: turn.usage.input, outputTokens: turn.usage.output, costMicros: callCost, latencyMs: Date.now() - started });
 
-    if (response.stop_reason === "refusal") {
-      handoffReason = "O modelo de IA recusou responder a esta mensagem.";
+    // Filtro de segurança: a resposta não é enviada; a conversa vai para um humano.
+    if (turn.blocked) {
+      handoffReason = "A resposta da IA foi bloqueada pelos filtros de segurança do modelo.";
       break;
     }
 
-    const toolUses = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
-    const text = response.content.filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text").map((b) => b.text).join("\n").trim();
-
-    if (response.stop_reason !== "tool_use" || toolUses.length === 0) {
-      finalText = text;
-      if (!finalText && response.stop_reason === "max_tokens") handoffReason = "A resposta da IA excedeu o limite de tamanho.";
+    if (turn.toolCalls.length === 0) {
+      finalText = turn.text;
       break;
     }
     if (step === AI_CONFIG.maxToolSteps) {
-      finalText = text;
+      finalText = turn.text;
       handoffReason ??= "Limite de ações automáticas por mensagem atingido.";
       break;
     }
 
     // 7–9. Executa cada ferramenta com verificação de permissão; resultados num único turno.
-    messages.push({ role: "assistant", content: response.content });
-    const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
-    for (const call of toolUses) {
-      const policy = allowed.get(call.name as never) ?? "denied";
-      const outcome = await executeTool(call.name, call.input, { repo, ctx, employeeId: employee.id, policy });
+    contents.push(turn.modelContent);
+    const responseParts: NonNullable<LlmContent["parts"]> = [];
+    for (const call of turn.toolCalls) {
+      const policy = allowed.get(call.name as ToolName) ?? "denied";
+      const outcome = await executeTool(call.name, call.args, { repo, ctx, employeeId: employee.id, policy });
       toolsUsed.push(call.name);
       if (outcome.approvalId) approvals.push(outcome.approvalId);
       if (outcome.handoff) handoffReason = outcome.handoff;
-      results.push({ type: "tool_result", tool_use_id: call.id, content: outcome.result, is_error: outcome.isError || undefined });
+      responseParts.push({
+        functionResponse: {
+          name: call.name,
+          ...(call.id ? { id: call.id } : {}),
+          response: outcome.isError ? { error: outcome.result } : { result: outcome.result },
+        },
+      });
     }
-    messages.push({ role: "user", content: results });
+    contents.push({ role: "user", parts: responseParts });
   }
 
   const reply = cleanReply(finalText);

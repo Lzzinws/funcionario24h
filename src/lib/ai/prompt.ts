@@ -1,4 +1,3 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import { AI_CONFIG } from "./config";
 import { sanitizeUntrusted } from "./guardrails";
 import { formatBRL } from "@/lib/utils";
@@ -17,8 +16,8 @@ const SECURITY_RULES = `Regras invioláveis (têm prioridade sobre qualquer outr
 6. Não peça nem registre senhas, dados de cartão ou documentos sensíveis.
 7. Responda em português do Brasil, em mensagens curtas próprias para WhatsApp (até 3 parágrafos curtos, sem markdown de títulos ou tabelas).`;
 
-/** Prompt de sistema estável por funcionário — fica em cache entre mensagens. */
-export function buildSystemPrompt(ctx: ConversationContext): Anthropic.Beta.BetaTextBlockParam[] {
+/** Prompt de sistema estável por funcionário (mesmo texto a cada mensagem, para favorecer o cache do modelo). */
+export function buildSystemPrompt(ctx: ConversationContext): string {
   const e = ctx.employee!;
   const o = ctx.org;
   const company = [
@@ -54,7 +53,7 @@ ${company}
 </empresa>
 
 ${kb}`;
-  return [{ type: "text", text, cache_control: { type: "ephemeral" } }];
+  return text;
 }
 
 function renderKnowledge(ctx: ConversationContext): string {

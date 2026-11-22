@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { AuthorizationError, requireOrg } from "@/lib/auth/session";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { anthropicLlm, LlmNotConfiguredError } from "@/lib/ai/llm";
+import { geminiLlm, LlmNotConfiguredError } from "@/lib/ai/llm";
 import { runEmployeeTurn } from "@/lib/ai/orchestrator";
 import { SupabaseAiRepository } from "@/lib/ai/supabase-repository";
 import { aiTestReadiness } from "@/lib/ai/readiness";
@@ -61,7 +61,7 @@ export async function sendTestMessage(employeeId: string, text: string): Promise
     .eq("organization_id", orgId).eq("id", conv.id);
 
   try {
-    const result = await runEmployeeTurn({ orgId, conversationId: conv.id }, { repo: new SupabaseAiRepository(db), llm: anthropicLlm() });
+    const result = await runEmployeeTurn({ orgId, conversationId: conv.id }, { repo: new SupabaseAiRepository(db), llm: geminiLlm() });
     revalidatePath(`/funcionarios/${employeeId}/testar`);
     switch (result.status) {
       case "replied":
@@ -71,7 +71,7 @@ export async function sendTestMessage(employeeId: string, text: string): Promise
       case "skipped":
         return { ok: false, message: `${result.reason} Reinicie o teste para continuar.` };
       case "error":
-        return { ok: false, message: result.retryable ? "O serviço de IA está ocupado. Tente novamente em instantes." : "Não foi possível obter resposta da IA. Verifique a chave da API." };
+        return { ok: false, message: result.retryable ? "O serviço de IA está ocupado. Tente novamente em instantes." : "Não foi possível obter resposta da IA. Verifique a GEMINI_API_KEY." };
     }
   } catch (e) {
     if (e instanceof LlmNotConfiguredError) return { ok: false, message: e.message };

@@ -55,7 +55,7 @@ export default async function TestEmployeePage({ params }: { params: Promise<{ i
             <CardBody className="grid gap-2 text-[13px] leading-relaxed text-sage-dark">
               <p>É o mesmo atendimento do WhatsApp: instruções, base de conhecimento, permissões e aprovações reais.</p>
               <p>Oportunidades criadas aqui ficam marcadas como teste e não entram nos indicadores. O consumo de IA conta na franquia do plano.</p>
-              <p className="tabular">Modelo: {AI_CONFIG.model} · esforço {AI_CONFIG.effort}</p>
+              <p className="tabular">Modelo: {AI_CONFIG.model}</p>
             </CardBody>
           </Card>
         </div>

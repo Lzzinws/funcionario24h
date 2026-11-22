@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { FunctionDeclaration } from "@google/genai";
 import { TOOL_CATALOG, effectivePolicy, isToolName, type ToolName } from "@/lib/employees/tools";
 import type { ToolPolicy } from "@/lib/types";
 
@@ -12,13 +12,13 @@ type JsonSchema = Record<string, unknown>;
 const str = (description: string, maxLength = 500): JsonSchema => ({ type: "string", description, maxLength });
 const nullable = (s: JsonSchema): JsonSchema => ({ ...s, type: [s.type as string, "null"] });
 
-function objectSchema(properties: Record<string, JsonSchema>): Anthropic.Beta.BetaTool.InputSchema {
+function objectSchema(properties: Record<string, JsonSchema>): JsonSchema {
   return { type: "object", properties, required: Object.keys(properties), additionalProperties: false };
 }
 
 const LEAD_STAGES = ["novo", "qualificado", "proposta", "negociacao"] as const;
 
-export const TOOL_DEFS: Record<ToolName, { description: string; schema: Anthropic.Beta.BetaTool.InputSchema; zod: z.ZodTypeAny }> = {
+export const TOOL_DEFS: Record<ToolName, { description: string; schema: JsonSchema; zod: z.ZodTypeAny }> = {
   search_knowledge: {
     description: "Busca na base de conhecimento da empresa (produtos, serviços, preços, políticas, perguntas frequentes). Use antes de afirmar qualquer preço, prazo ou política que não esteja no contexto.",
     schema: objectSchema({ query: str("Palavras-chave da busca, em português", 200) }),
@@ -96,14 +96,13 @@ export function allowedTools(tools: string[], permissions: Record<string, ToolPo
 }
 
 /** Converte em definições da API, em ordem determinística (estável para cache). */
-export function toApiTools(allowed: Map<ToolName, ToolPolicy>): Anthropic.Beta.BetaTool[] {
+export function toApiTools(allowed: Map<ToolName, ToolPolicy>): FunctionDeclaration[] {
   return [...allowed.keys()].sort().map((name) => ({
     name,
     description:
       TOOL_DEFS[name].description +
       (allowed.get(name) === "approval" ? " Esta ação fica pendente até aprovação humana." : ""),
-    input_schema: TOOL_DEFS[name].schema,
-    strict: true,
+    parametersJsonSchema: TOOL_DEFS[name].schema,
   }));
 }
 
