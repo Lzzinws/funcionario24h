@@ -191,5 +191,25 @@ select t.ok(jsonb_array_length(public.org_dashboard_stats((select v from ids whe
             and (select sum(x::int) from jsonb_array_elements_text(public.org_dashboard_stats((select v from ids where k='orgA')) -> 'hourly') x) = 1,
             'indicadores: 24 horas e 1 mensagem contabilizada');
 reset role;
+-- Núcleo de IA: operações atômicas do servidor ------------------------
+set role service_role;
+select t.ok((select count(*) from public.create_ai_approval(
+  (select v from ids where k='orgA'), (select id from public.employees where name='Ana'),
+  (select contact_id from public.conversations limit 1), (select id from public.conversations limit 1),
+  'request_discount', 'Oferecer 10%', 'Cliente fiel', '{"offer":"10%"}')) = 1, 'IA cria aprovação + tarefa atomicamente');
+select t.ok((select count(*) from public.tasks where tool = 'request_discount' and status = 'awaiting_approval' and requires_approval) = 1,
+            'tarefa sensível nasce aguardando aprovação');
+select t.expect_error(
+  $$select * from public.create_ai_approval((select v from ids where k='orgB'), (select id from public.employees where name='Ana'),
+    (select contact_id from public.conversations limit 1), (select id from public.conversations limit 1), 'request_discount', 'x', 'y', '{}')$$,
+  'IA não cria aprovação apontando para outra organização');
+select t.ok(public.org_month_ai_tokens((select v from ids where k='orgA')) = 0, 'consumo mensal calculado');
+reset role;
+set role authenticated;
+select t.login('00000000-0000-0000-0000-00000000000a');
+select t.expect_error($$select public.org_month_ai_tokens((select v from ids where k='orgA'))$$, 'consumo mensal restrito ao servidor');
+select t.expect_error($$select * from public.create_ai_approval(null,null,null,null,'x','x','x','{}')$$, 'usuário não cria aprovação em nome da IA');
+reset role;
+
 \echo 'TODOS OS TESTES DE BANCO PASSARAM'
 rollback;

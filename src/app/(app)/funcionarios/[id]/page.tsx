@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, MessageSquareText } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { canManage, requireOrg } from "@/lib/auth/session";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +54,7 @@ export default async function EmployeePage({ params, searchParams }: { params: P
           <p className="text-[15px] text-sage-dark">{e.title}</p>
         </div>
         <div className="flex flex-wrap items-center gap-4">
+          <Button asChild variant="outline" size="sm"><Link href={`/funcionarios/${e.id}/testar`}><MessageSquareText aria-hidden />Testar conversa</Link></Button>
           {manage ? <DefaultButton id={e.id} isDefault={e.is_default} /> : e.is_default ? <Badge tone="success">Recebe as novas conversas</Badge> : null}
           <ActiveToggle id={e.id} name={e.name} active={e.is_active} disabled={!manage} />
         </div>
