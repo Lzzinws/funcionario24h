@@ -10,7 +10,7 @@ Arquitetura, riscos e plano completo: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.m
 
 | Fase | Situação |
 |---|---|
-| 1. Fundação, auth, banco, organizações | ✅ Pronta — schema completo, RLS, 8 migrations, 41 testes SQL |
+| 1. Fundação, auth, banco, organizações | ✅ Pronta — schema completo, RLS, 10 migrations, 49 testes SQL |
 | 2. Dashboard, navegação, identidade visual | ✅ Pronta — dados reais via `org_dashboard_stats` |
 | 3. Funcionários | ✅ Pronta — CRUD, modelos, instruções versionadas, permissões por ferramenta, desempenho |
 | Base de conhecimento | ✅ Pronta (texto). Upload de arquivos: pendente (Supabase Storage) |
@@ -18,7 +18,7 @@ Arquitetura, riscos e plano completo: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.m
 | 5. WhatsApp Cloud API | ⏳ Pendente — schema de integração, segredos e deduplicação prontos |
 | 6–9 | ⏳ Pendente — aprovações, CRM e admin já têm regras e RPCs no banco, testadas |
 
-Ainda **não** foi testado contra um projeto Supabase real (o banco foi validado em Postgres 16 local com um stub do schema `auth`).
+Em produção: app no Vercel (`funcionario24h.vercel.app`) e banco no Supabase (região São Paulo) com todas as migrations aplicadas. Os testes SQL rodam em Postgres 16 local com um stub do schema `auth`; o fluxo de cadastro com usuário real ainda não foi exercitado.
 
 ## Núcleo de IA
 
