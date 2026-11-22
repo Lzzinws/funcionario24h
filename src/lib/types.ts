@@ -45,6 +45,11 @@ export interface Subscription {
   status: "trialing" | "active" | "past_due" | "canceled" | "suspended";
   trial_ends_at: string | null;
   current_period_end: string;
+  cancel_at: string | null;
+  provider_subscription_id: string | null;
+  provider_status: string | null;
+  last_payment_at: string | null;
+  last_payment_status: string | null;
 }
 
 export interface EmployeeTemplate {

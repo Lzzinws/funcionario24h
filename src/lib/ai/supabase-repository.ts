@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AiRepository, ConversationContext, KnowledgeSnippet } from "./types";
+import { canOperate, effectiveState, type SubscriptionLike } from "@/lib/billing/state";
 
 /**
  * Repositório do orquestrador sobre o Supabase com service_role.
@@ -31,7 +32,7 @@ export class SupabaseAiRepository implements AiRepository {
     const [org, contact, sub, history] = await Promise.all([
       this.db.from("organizations").select("id, name, segment, description, address, business_hours, phone, website, timezone, status").eq("id", orgId).single(),
       this.db.from("contacts").select("id, name, phone_e164, email, opted_out_at").eq("organization_id", orgId).eq("id", conv.contact_id).single(),
-      this.db.from("subscriptions").select("status, plans(monthly_ai_tokens)").eq("organization_id", orgId).maybeSingle(),
+      this.db.from("subscriptions").select("status, trial_ends_at, current_period_end, cancel_at, plans(monthly_ai_tokens)").eq("organization_id", orgId).maybeSingle(),
       this.db.from("messages").select("direction, sender_type, content, created_at")
         .eq("organization_id", orgId).eq("conversation_id", conversationId)
         .order("created_at", { ascending: false }).limit(40),
@@ -60,7 +61,7 @@ export class SupabaseAiRepository implements AiRepository {
         ])
       : [{ data: null }, { data: [] }, { data: 0 }];
 
-    const s = sub.data as { status: string; plans: { monthly_ai_tokens: number } | null } | null;
+    const s = sub.data as (SubscriptionLike & { plans: { monthly_ai_tokens: number } | null }) | null;
     return {
       org: this.check(org, "organização"),
       conversation: conv,
@@ -70,7 +71,7 @@ export class SupabaseAiRepository implements AiRepository {
       knowledge: (knowledge.data ?? []) as KnowledgeSnippet[],
       history: (this.check(history, "histórico") ?? []).reverse(),
       plan: s?.plans ?? null,
-      subscriptionActive: !!s && ["trialing", "active", "past_due"].includes(s.status),
+      subscriptionActive: canOperate(effectiveState(s)),
       monthTokensUsed: Number(monthTokens.data ?? 0),
     } as ConversationContext;
   }

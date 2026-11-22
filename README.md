@@ -10,11 +10,12 @@ Arquitetura, riscos e plano completo: [`docs/ARQUITETURA.md`](docs/ARQUITETURA.m
 
 | Fase | Situação |
 |---|---|
-| 1. Fundação, auth, banco, organizações | ✅ Pronta — schema completo, RLS, 10 migrations, 49 testes SQL |
+| 1. Fundação, auth, banco, organizações | ✅ Pronta — schema completo, RLS, 11 migrations, 69 testes SQL |
 | 2. Dashboard, navegação, identidade visual | ✅ Pronta — dados reais via `org_dashboard_stats` |
 | 3. Funcionários | ✅ Pronta — CRUD, modelos, instruções versionadas, permissões por ferramenta, desempenho |
 | Base de conhecimento | ✅ Pronta (texto). Upload de arquivos: pendente (Supabase Storage) |
 | 4. Núcleo de IA | ✅ Pronta — orquestrador, 10 ferramentas com permissão/aprovação, proteção contra prompt injection, custos e franquia; tela "Testar funcionário" |
+| Pagamentos (Mercado Pago) | ✅ Implementado — checkout de assinatura, webhook assinado, ativação automática do plano; teste em sandbox pendente (ver `docs/PAGAMENTOS.md`) |
 | 5. WhatsApp Cloud API | ⏳ Pendente — schema de integração, segredos e deduplicação prontos |
 | 6–9 | ⏳ Pendente — aprovações, CRM e admin já têm regras e RPCs no banco, testadas |
 
