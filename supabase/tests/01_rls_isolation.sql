@@ -23,8 +23,14 @@ begin
   if not coalesce(p_cond, false) then raise exception 'FALHOU: %', p_label; end if;
   raise notice 'ok  %', p_label;
 end $$;
-grant usage on schema t to authenticated, service_role;
-grant execute on all functions in schema t to authenticated, service_role;
+grant usage on schema t to anon, authenticated, service_role;
+grant execute on all functions in schema t to anon, authenticated, service_role;
+
+-- Visitante anônimo vê os planos ativos (página de preços) ----------------
+set role anon;
+select t.ok((select count(*) from public.plans) = 3, 'visitante anônimo lê os planos ativos');
+select t.ok((select count(*) from public.organizations) = 0, 'visitante anônimo não vê organizações');
+reset role;
 
 -- Usuários -------------------------------------------------------------
 insert into auth.users (id, email, raw_user_meta_data) values

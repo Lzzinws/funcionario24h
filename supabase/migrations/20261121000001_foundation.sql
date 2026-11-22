@@ -15,7 +15,7 @@ grant usage on schema private to authenticated, service_role;
 -- updated_at automático
 -- ---------------------------------------------------------------------
 create or replace function private.set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = '' as $$
 begin
   new.updated_at := now();
   return new;
